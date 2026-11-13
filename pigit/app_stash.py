@@ -160,13 +160,6 @@ class StashPanel(OptionList):
             return ""
         return f"{stash.msg}  {stash.ref}"
 
-    def preview_lines(self) -> list[str]:
-        """Return diff lines for the selected stash."""
-        stash = self._current_stash()
-        if stash is None:
-            return []
-        return self._vm.load_stash_diff(stash.ref)
-
     @bind_action("pop", "p", desc="Pop selected stash onto working tree", tip="Pop")
     def pop(self) -> None:
         # Hand over the sha too: popping drops the entry, so the captured

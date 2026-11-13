@@ -10,14 +10,6 @@
 
 version = "unknown"
 
-[cmd]
-
-# (bool) Show original git command.
-display = true
-
-# (bool) Is it recommended to correct when entering wrong commands.
-recommend = true
-
 [counter]
 
 # (bool) Whether to use the ignore configuration of the `.gitignore` file.
@@ -34,9 +26,6 @@ show_icon = false
 format = "table"
 
 [info]
-
-# Git local config print format. Supported: [table, normal]
-git_config_format = "table"
 
 # Control which parts need to be displayed when viewing git repository information.
 # Support: (path, remote, branch, log, summary)

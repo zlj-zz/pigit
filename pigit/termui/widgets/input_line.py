@@ -563,7 +563,3 @@ class InputLine(Component):
             fm.focus_release()
         if invoke_cancel and self._on_cancel:
             self._on_cancel()
-
-    def _exit_overlay_mode(self) -> None:
-        """Exit overlay mode via cancel (Esc): hide, release focus, notify."""
-        self._dismiss_overlay(invoke_cancel=True)

@@ -149,6 +149,3 @@ class ReflogEntry:
     refish: str
     message: str
     when: int
-
-
-GitFuncT = Callable[[File], None]

@@ -129,7 +129,6 @@ class SessionHistory:
         self._max_items = max_items
         self._max_memory = max_memory_mb * 1024 * 1024
         self._current_memory = 0
-        self._prev_branch: str | None = None
         self._active_repo: str = ""
 
     def attach_repo(self, repo_path: str) -> None:
@@ -235,13 +234,6 @@ class SessionHistory:
             self._current_memory -= _estimate_memory(evicted)
             _logger.debug("Evicted history record: %s", evicted.description)
 
-    def on_pre_checkout(self, current_branch: str) -> None:
-        """Call before checkout to remember the previous branch."""
-        self._prev_branch = current_branch
-
-    @property
-    def prev_branch(self) -> str | None:
-        return self._prev_branch
 
 
 # ------------------------------------------------------------------

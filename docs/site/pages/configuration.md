@@ -28,12 +28,10 @@ for a full template.
 | `show_footer` | bool | `true` | Footer key-hint bar |
 | `icons` | str | `auto` | Nerd Font icons: `auto`, `on`, `off` |
 
-## Command display
+## Repo and logging
 
 | Section | Key | Default | Description |
 |---------|-----|---------|-------------|
-| `[cmd]` | `display` | `true` | Show underlying git command |
-| `[cmd]` | `recommend` | `true` | Suggest corrections for typos |
 | `[repo]` | `auto_append` | `true` | Auto-add cwd to managed repos |
 | `[log]` | `debug` | `false` | Debug logging |
 | `[log]` | `output` | `false` | Print logs to terminal |

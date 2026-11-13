@@ -871,26 +871,11 @@ class PigitApplication(Application):
         if self._log_graph_preview is not None:
             self._log_graph_preview.set_vm(session.branch_vm)
 
-    def _start_repo_observe(self) -> None:
-        """Delegate to ObserveHost.start()."""
-        if self._observe_host is not None:
-            self._observe_host.start()
-
     def _build_observe_roots(self):
         """Delegate to ObserveHost.build_roots()."""
         if self._observe_host is None:
             return []
         return self._observe_host.build_roots()
-
-    def _resync_observe_roots(self, *, reset: bool = False) -> None:
-        """Delegate to ObserveHost.resync_roots()."""
-        if self._observe_host is not None:
-            self._observe_host.resync_roots(reset=reset)
-
-    def _stop_repo_observe(self) -> None:
-        """Delegate to ObserveHost.stop()."""
-        if self._observe_host is not None:
-            self._observe_host.stop()
 
     def _on_observe_batch(self, batch) -> None:
         """Delegate to ObserveHost.on_batch()."""
@@ -948,17 +933,6 @@ class PigitApplication(Application):
             self._header_state.dirty = dirty
 
         run_async(worker, apply)
-
-    def _side_preview_for_active(self) -> Component | None:
-        """Return the one large-screen side panel for the current tab, or None."""
-        if self._is_detail_open() or not self._is_large_screen:
-            return None
-        active = resolve_presentation_leaf(self._tab_view.visible)
-        if isinstance(active, (StatusPanel, StashPanel)):
-            return self._preview_panel if self._diff_preview_wanted else None
-        if isinstance(active, BranchPanel):
-            return self._log_graph_preview if self._log_graph_wanted else None
-        return None
 
     def _apply_body_widths(self, cols: int) -> None:
         """Update SplitPane detail and widths for the active tab."""
@@ -1084,14 +1058,6 @@ class PigitApplication(Application):
         """Cycle focus to the previous panel in the Status → Stash → Branch → Commit → Graph ring."""
         self._close_detail_if_open()
         self._cycle_panel(-1)
-
-    def _panel_ring(self) -> tuple[Component, ...]:
-        """Return the panels that Tab/Shift+Tab cycle through, in order."""
-        return self._panel_nav.panel_ring()
-
-    def _ring_index(self) -> int | None:
-        """Index in the panel ring from the product TabView."""
-        return self._panel_nav.ring_index()
 
     def _focus_destination(self, panel: Component) -> None:
         """Route the product TabView to *panel*."""
@@ -2179,10 +2145,6 @@ class PigitApplication(Application):
     def _network_sync_busy(self, value: bool) -> None:
         self._network_git.busy = value
 
-    def _handle_pull_conflict(self, message: str) -> None:
-        """Delegate to NetworkGit.handle_pull_conflict()."""
-        self._network_git.handle_pull_conflict(message)
-
     def _refresh_git_vms(self) -> None:
         """Refresh Status, Branch, and Commit VMs (safe while a palette overlay is open)."""
         self._status_vm.refresh()
@@ -2228,10 +2190,6 @@ class PigitApplication(Application):
     def _confirm_push_and_finish(self, target: str, source: str) -> None:
         """Delegate to MergeWorkflow.confirm_push_and_finish()."""
         self._merge_workflow.confirm_push_and_finish(target, source)
-
-    def _finish_merge_checkout(self, target: str, source: str) -> None:
-        """Delegate to MergeWorkflow.finish_merge_checkout()."""
-        self._merge_workflow.finish_merge_checkout(target, source)
 
     def _continue_merge(self) -> None:
         """Delegate to MergeWorkflow.continue_merge()."""

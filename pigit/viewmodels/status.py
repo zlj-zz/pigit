@@ -155,25 +155,6 @@ class StatusViewModel(ViewModelBase["File"], IStatusViewModel):
         except Exception as e:
             return ActionResult(success=False, message=str(e))
 
-    def _run_batch(
-        self,
-        indices: set[int],
-        op: Callable[[File], None],
-        msg_template: str,
-    ) -> ActionResult:
-        """Execute a batch git operation and return an ActionResult."""
-        items = self._items.value
-        count = 0
-        try:
-            for idx in sorted(indices):
-                if 0 <= idx < len(items):
-                    op(items[idx])
-                    count += 1
-        except Exception as e:
-            return ActionResult(success=False, message=str(e))
-        return ActionResult(
-            success=True, message=msg_template.format(count), should_refresh=count > 0
-        )
 
     def needs_stage(self, idx: int) -> bool:
         """Return True when staging *idx* would run ``git add`` (not unstage)."""

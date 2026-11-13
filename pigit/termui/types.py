@@ -93,7 +93,6 @@ class OverlayDispatchResult(Enum):
     """Result of overlay key dispatch."""
 
     HANDLED_EXPLICIT = auto()
-    HANDLED_IMPLICIT = auto()
     DROPPED_UNBOUND = auto()
     CLOSED_AFTER_ERROR = auto()
 
@@ -108,5 +107,3 @@ class PreviewPayload(Protocol):
     """Side-preview data source for Status/Stash-style panels."""
 
     def preview_title(self) -> str: ...
-
-    def preview_lines(self) -> list[str]: ...

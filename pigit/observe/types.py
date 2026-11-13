@@ -28,7 +28,6 @@ class BackendHealth(Enum):
 
     OK = "ok"
     DEGRADED = "degraded"
-    FAILED = "failed"
 
 
 @dataclass(frozen=True)

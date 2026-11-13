@@ -12,12 +12,6 @@ from typing import Literal
 
 
 @dataclass
-class CmdConfig:
-    display: bool = True
-    recommend: bool = True
-
-
-@dataclass
 class CounterConfig:
     use_gitignore: bool = True
     show_invalid: bool = False
@@ -27,7 +21,6 @@ class CounterConfig:
 
 @dataclass
 class InfoConfig:
-    git_config_format: Literal["normal", "table"] = "table"
     repo_include: list[str] = field(default_factory=lambda: ["remote", "branch", "log"])
 
 
@@ -65,8 +58,6 @@ class AppConfig:
 
 @dataclass
 class ConfigData:
-    version: str = "unknown"
-    cmd: CmdConfig = field(default_factory=CmdConfig)
     counter: CounterConfig = field(default_factory=CounterConfig)
     info: InfoConfig = field(default_factory=InfoConfig)
     repo: RepoConfig = field(default_factory=RepoConfig)

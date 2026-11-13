@@ -228,13 +228,10 @@ See [`examples/pigit.toml`](./examples/pigit.toml) for a full template.
 
 | section | key | type | default | description |
 |---------|-----|------|---------|-------------|
-| `[cmd]` | `display` | bool | `True` | show original git command |
-| `[cmd]` | `recommend` | bool | `True` | suggest corrections for wrong commands |
 | `[counter]` | `use_gitignore` | bool | `True` | respect `.gitignore` when counting |
 | `[counter]` | `show_invalid` | bool | `False` | show files that cannot be counted |
 | `[counter]` | `show_icon` | bool | `True` | show file icons (requires Nerd Font) |
 | `[counter]` | `format` | str | `table` | output format: `table` or `simple` |
-| `[info]` | `git_config_format` | str | `table` | git config display: `table` or `normal` |
 | `[info]` | `repo_include` | list | `["remote", "branch", "log"]` | sections to show in repo info |
 | `[repo]` | `auto_append` | bool | `True` | auto-add current repo to managed list |
 | `[log]` | `debug` | bool | `False` | debug mode |

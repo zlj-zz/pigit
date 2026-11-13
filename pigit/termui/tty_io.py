@@ -18,8 +18,6 @@ from .wcwidth_table import truncate_by_width, wcswidth
 #   \x08 (8) BS   Backspace; \x7f (127) DEL — often Backspace on Unix TTYs.
 #   0x40–0x7E     Inclusive range of the final byte of a CSI/SS3 sequence (``@`` through ``~``).
 
-MIN_LIST_ROWS = 1
-
 SUPPORTED_SYSTEMS = "macOS, Linux"
 
 UNSUPPORTED_PLATFORM_MSG = (

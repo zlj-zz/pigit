@@ -42,7 +42,6 @@ SLATE_DARK: tuple[int, int, int] = (49, 50, 58)
 FOREST: tuple[int, int, int] = (35, 65, 45)
 OLIVE: tuple[int, int, int] = (75, 65, 20)
 MAROON: tuple[int, int, int] = (80, 40, 40)
-DARK_CRIMSON: tuple[int, int, int] = (55, 35, 35)
 MIDNIGHT: tuple[int, int, int] = (30, 50, 75)
 
 # Light / bright
@@ -90,9 +89,7 @@ def blend(
     )  # type: ignore[return-value]
 
 
-BG_HOVER = GUNMETAL
 BG_ACTIVE = NAVY_GRAY
-BG_DANGER_ROW = DARK_CRIMSON
 
 # ── Style flags (bitmask) ──
 STYLE_BOLD = 1 << 0

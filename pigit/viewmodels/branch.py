@@ -92,8 +92,6 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             return ActionResult(success=False, message="Invalid index")
         current = self._git.get_head() or ""
         try:
-            if self._history is not None:
-                self._history.on_pre_checkout(current)
             self._git.checkout_branch(b.name)
             result = ActionResult(
                 success=True, message=f"Switched to {b.name}", should_refresh=True
@@ -134,8 +132,6 @@ class BranchViewModel(ViewModelBase["Branch"], IBranchViewModel):
             )
         current = self._git.get_head() or ""
         try:
-            if self._history is not None:
-                self._history.on_pre_checkout(current)
             self._git.create_branch(name, start_point)
         except Exception as e:
             return ActionResult(success=False, message=str(e))

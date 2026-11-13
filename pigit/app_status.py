@@ -1149,14 +1149,6 @@ class StatusPanel(OptionList):
         label = _status_label(file)
         return file.display_str if not label else f"{file.display_str}  {label}"
 
-    def preview_lines(self) -> list[str]:
-        """Return diff lines for the current file selection."""
-        hit = self.file_at_cursor()
-        if hit is None:
-            return []
-        _, source_idx = hit
-        return self._vm.load_diff(source_idx)
-
     def _target_indices(self) -> set[int]:
         """Source indices for the current Status action.
 

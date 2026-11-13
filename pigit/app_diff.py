@@ -712,14 +712,10 @@ class DiffViewer(Component):
 
         self._tokenize_task.start(_work, _callback)
 
-    # Static helpers re-exported for tests that still call DiffViewer.* (thin aliases).
+    # DiffContent line classifiers the renderer calls by short name.
     _is_file_header = staticmethod(DiffContent.is_file_header)
-    _is_file_boundary = staticmethod(DiffContent.is_file_boundary)
     _is_add_line = staticmethod(DiffContent.is_add_line)
     _is_del_line = staticmethod(DiffContent.is_del_line)
-    _word_diff_ranges = staticmethod(DiffContent.word_diff_ranges)
-    _ranges_to_segments = staticmethod(DiffContent.ranges_to_segments)
-    _pre_tokenize_with = staticmethod(DiffContent.pre_tokenize_with)
 
     def set_diff_type(self, diff_type: DiffType) -> None:
         """Set the diff type (unstaged, staged, or commit)."""

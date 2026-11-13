@@ -248,10 +248,6 @@ class FakeBackend:
         """Return configured health."""
         return self._health
 
-    def set_health(self, health: BackendHealth) -> None:
-        """Test helper to force health."""
-        self._health = health
-
     def poll(self) -> list[PathSignal]:
         """Return the next scripted batch, or empty when exhausted."""
         if not self._started or self._index >= len(self._scripted):

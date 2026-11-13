@@ -9,7 +9,6 @@ import tomllib
 
 from .config_data import (
     ConfigData,
-    CmdConfig,
     CounterConfig,
     InfoConfig,
     RepoConfig,
@@ -96,14 +95,6 @@ class Config:
 
         version = "{version}"
 
-        [cmd]
-
-        # (bool) Show original git command.
-        display = {cmd_display}
-
-        # (bool) Is it recommended to correct when entering wrong commands.
-        recommend = {cmd_recommend}
-
         [counter]
 
         # (bool) Whether to use the ignore configuration of the `.gitignore` file.
@@ -120,9 +111,6 @@ class Config:
         format = "{counter_format}"
 
         [info]
-
-        # Git local config print format. Supported: [table, normal]
-        git_config_format = "{git_config_format}"
 
         # Control which parts need to be displayed when viewing git repository information.
         # Support: (path, remote, branch, log, summary)
@@ -182,7 +170,6 @@ class Config:
         """)
 
     _counter_format_candidate: list[str] = ["table", "simple"]
-    _git_config_format_candidate: list[str] = ["normal", "table"]
     _status_view_candidate: list[str] = ["flat", "tree"]
 
     def __init__(
@@ -190,7 +177,7 @@ class Config:
     ) -> None:
         self.config_file_path: str = path
         self.current_version: str = version
-        self._data = ConfigData(version=version)
+        self._data = ConfigData()
         self._warnings: list[str] = []
         self.log = logging.getLogger()
 
@@ -258,13 +245,6 @@ class Config:
 
         version = raw.get("version", self.current_version)
 
-        # Parse [cmd] section
-        cmd_raw = raw.get("cmd", {})
-        cmd = CmdConfig(
-            display=cmd_raw.get("display", True),
-            recommend=cmd_raw.get("recommend", True),
-        )
-
         # Parse [counter] section
         counter_raw = raw.get("counter", {})
         counter_format = counter_raw.get("format", "table")
@@ -284,24 +264,13 @@ class Config:
 
         # Parse [info] section
         info_raw = raw.get("info", {})
-        git_config_format = info_raw.get("git_config_format", "table")
-        if git_config_format not in self._git_config_format_candidate:
-            git_config_format = "table"
-            self._warnings.append(
-                'Config key "info.git_config_format" support must in {}'.format(
-                    self._git_config_format_candidate
-                )
-            )
         repo_include = info_raw.get("repo_include", ["remote", "branch", "log"])
         if not isinstance(repo_include, list):
             repo_include = ["remote", "branch", "log"]
             self._warnings.append(
                 'Config key "info.repo_include" should be a list, using default.'
             )
-        info = InfoConfig(
-            git_config_format=git_config_format,
-            repo_include=repo_include,
-        )
+        info = InfoConfig(repo_include=repo_include)
 
         # Parse [repo] section
         repo_raw = raw.get("repo", {})
@@ -390,8 +359,6 @@ class Config:
             )
 
         return ConfigData(
-            version=version,
-            cmd=cmd,
             counter=counter,
             info=info,
             repo=repo,
@@ -428,13 +395,10 @@ class Config:
                 f.write(
                     self.CONFIG_TEMPLATE.format(
                         version=self.current_version,
-                        cmd_display=str(data.cmd.display).lower(),
-                        cmd_recommend=str(data.cmd.recommend).lower(),
                         counter_use_gitignore=str(data.counter.use_gitignore).lower(),
                         counter_show_invalid=str(data.counter.show_invalid).lower(),
                         counter_show_icon=str(data.counter.show_icon).lower(),
                         counter_format=data.counter.format,
-                        git_config_format=data.info.git_config_format,
                         repo_info_include=data.info.repo_include,
                         repo_auto_append=str(data.repo.auto_append).lower(),
                         log_debug=str(data.log.debug).lower(),

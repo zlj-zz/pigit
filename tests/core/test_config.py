@@ -26,7 +26,6 @@ def test_create(tmp_path):
     assert config_path.exists()
     content = config_path.read_text(encoding="utf-8")
     assert 'version = "test"' in content
-    assert "[cmd]" in content
     assert "[counter]" in content
     assert "[app]" in content
     assert "[tui]" not in content
@@ -42,13 +41,10 @@ def test_load():
         auto_load=True,
     )
     data = c.get()
-    assert data.cmd.display is False
-    assert data.cmd.recommend is False
     assert data.counter.use_gitignore is False
     assert data.counter.show_invalid is True
     assert data.counter.show_icon is True
     assert data.counter.format == "simple"
-    assert data.info.git_config_format == "normal"
     assert data.info.repo_include == ["path", "remote"]
     assert data.repo.auto_append is False
     assert data.log.debug is True
@@ -72,11 +68,8 @@ def test_default_values_when_no_config_file():
         auto_load=True,
     )
     data = c.get()
-    assert data.cmd.display is True
-    assert data.cmd.recommend is True
     assert data.counter.use_gitignore is True
     assert data.counter.format == "table"
-    assert data.info.git_config_format == "table"
     assert data.info.repo_include == ["remote", "branch", "log"]
     assert data.repo.auto_append is True
     assert data.log.debug is False
@@ -142,9 +135,6 @@ def test_invalid_format_falls_back_to_default(tmp_path):
                 "",
                 "[counter]",
                 'format = "invalid"',
-                "",
-                "[info]",
-                'git_config_format = "invalid"',
             ]
         ),
         encoding="utf-8",
@@ -157,9 +147,7 @@ def test_invalid_format_falls_back_to_default(tmp_path):
     )
     data = c.get()
     assert data.counter.format == "table"
-    assert data.info.git_config_format == "table"
     assert any("counter.format" in w for w in c._warnings)
-    assert any("git_config_format" in w for w in c._warnings)
 
 
 def test_toml_read_with_comments_and_inline_strings(tmp_path):
@@ -170,10 +158,6 @@ def test_toml_read_with_comments_and_inline_strings(tmp_path):
                 "#? Config file for pigit v. test",
                 "# full line comment",
                 'version = "test"',
-                "",
-                "[cmd]",
-                "display = true",
-                "recommend = false",
                 "",
                 "[info]",
                 'repo_include = ["path#hash", "remote"]',
@@ -188,8 +172,6 @@ def test_toml_read_with_comments_and_inline_strings(tmp_path):
         auto_load=True,
     )
     data = c.get()
-    assert data.cmd.display is True
-    assert data.cmd.recommend is False
     assert data.info.repo_include == ["path#hash", "remote"]
 
 
